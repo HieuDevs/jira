@@ -31,7 +31,6 @@ export const sessionMiddleware = createMiddleware<AdditionalContext>(async (c, n
 
     // Verify session is valid by getting user
     const user = await account.get();
-
     const databases = new Databases(client);
     const storage = new Storage(client);
     const users = new Users(client);
