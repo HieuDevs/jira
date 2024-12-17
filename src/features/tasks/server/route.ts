@@ -2,12 +2,13 @@ import { DATABASE_ID, MEMBERS_ID, PROJECTS_ID, TASKS_ID } from '@/config';
 import { getMember } from '@/features/members/utils';
 import { Project } from '@/features/projects/types';
 import { createTaskSchema } from "@/features/tasks/schemas";
+import { createAdminClient } from '@/lib/appwrite';
 import { sessionMiddleware } from "@/lib/session-middleware";
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from "hono";
 import { ID, Query } from 'node-appwrite';
 import { z } from "zod";
-import { TaskPriority, TaskStatus } from '../types';
+import { Task, TaskPriority, TaskStatus } from '../types';
 
 const app = new Hono()
     .get(
@@ -20,10 +21,10 @@ const app = new Hono()
             status: z.nativeEnum(TaskStatus).nullish(),
             priority: z.nativeEnum(TaskPriority).nullish(),
             search: z.string().nullish(),
-            dueDate: z.date().nullish(),
+            dueDate: z.string().nullish(),
         })),
         async (c) => {
-            const users = c.get("users");
+            const {users} = await createAdminClient();
             const user = c.get("user");
             const databases = c.get("databases");
             const {workspaceId,projectId,assigneeId,status,priority,search,dueDate} = c.req.valid("query");
@@ -57,21 +58,20 @@ const app = new Hono()
             }
             if(dueDate) {
                 console.log("dueDate",dueDate);
-                query.push(Query.equal("dueDate",dueDate.toISOString()));
+                query.push(Query.equal("dueDate",dueDate));
             }
             if(search) {
                 console.log("search",search);
                 query.push(Query.search("name",search));
             }
-            const tasks = await databases.listDocuments(
+            const tasks = await databases.listDocuments<Task>(
                 DATABASE_ID,
                 TASKS_ID,
                 query
             );
             const projectIds = tasks.documents.map((task) => task.projectId);
 
-            const assigneeIds = [...new Set(tasks.documents.map((task) => task.assigneeId))];
-
+            const assigneeIds = [...new Set(tasks.documents.map((task) => task.assigneeId).flat())];
 
             const projects = await databases.listDocuments<Project>(
                 DATABASE_ID,
@@ -85,6 +85,7 @@ const app = new Hono()
                 assigneeIds.length > 0 ? [Query.contains("$id", assigneeIds)] : []
             );
 
+
             const assignees = await Promise.all(members.documents.map(async (member) => {
                 const user = await users.get(member.userId);
                 return {
@@ -97,7 +98,7 @@ const app = new Hono()
 
             const popupatedTasks = tasks.documents.map((task) => {
                 const project = projects.documents.find((project) => project.$id === task.projectId);
-                const assignee = assignees.find((assignee) => assignee.$id === task.assigneeId);
+                const assignee = assignees.find((assignee) => task.assigneeId.includes(assignee.$id));
                 return {
                     ...task,
                     project,

@@ -20,6 +20,6 @@ export const createTaskSchema = z.object({
   assigneeId: z.array(z.string(), {
     message: "Assignee ID is required",
   }),
-  dueDate: z.date().optional(),
+  dueDate: z.coerce.date().optional(),
   description: z.string().optional(),
 });

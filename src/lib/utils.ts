@@ -12,3 +12,10 @@ export function generateInviteCode(length: number = 6) {
     () => characters[Math.floor(Math.random() * characters.length)]
   ).join('');
 }
+
+export function snakeCaseToTitleCase(str: string) {
+  return str
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
