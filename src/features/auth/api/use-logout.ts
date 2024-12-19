@@ -18,11 +18,11 @@ export const useLogout = () => {
       }
       return await response.json();
     },
-    onSuccess: async () => {
-      router.refresh();
-      await queryClient.invalidateQueries({ queryKey: ["current"] });
-      await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+    onSuccess: () => {
       toast.success("Logged out successfully");
+      router.refresh();
+      queryClient.invalidateQueries({ queryKey: ["current"] });
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
     },
     onError: () => {
       toast.error("Failed to logout");

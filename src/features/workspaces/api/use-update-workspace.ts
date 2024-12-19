@@ -20,11 +20,11 @@ export const useUpdateWorkspace = () => {
       }
       return await response.json();
     },
-    onSuccess: async ({data}) => {
+    onSuccess: ({data}) => {
       toast.success("Workspace updated successfully");
       router.push(`/workspaces/${data.$id}`);
-      await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-      await queryClient.invalidateQueries({ queryKey: ["workspace", data.$id] });
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      queryClient.invalidateQueries({ queryKey: ["workspace", data.$id] });
     },
     onError: () => {
       toast.error("Failed to update workspace");

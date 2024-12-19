@@ -21,11 +21,11 @@ export const useResetInviteCode = () => {
       }
       return await response.json();
     },
-    onSuccess: async ({data}) => {
+    onSuccess: ({data}) => {
       toast.success("Invite code reset successfully");
       router.refresh();
-      await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-      await queryClient.invalidateQueries({ queryKey: ["workspace", data.$id] });
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      queryClient.invalidateQueries({ queryKey: ["workspace", data.$id] });
     },
     onError: () => {
       toast.error("Failed to reset invite code");

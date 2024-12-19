@@ -19,10 +19,10 @@ export const useJoinWorkspace = () => {
       }
       return await response.json();
     },
-    onSuccess: async ({data}) => {
-      await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-      await queryClient.invalidateQueries({ queryKey: ["workspace", data.$id] });
+    onSuccess: ({data}) => {
       toast.success("Joined workspace successfully");
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      queryClient.invalidateQueries({ queryKey: ["workspace", data.$id] });
     },
     onError: () => {
       toast.error("Failed to join workspace");

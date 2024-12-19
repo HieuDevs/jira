@@ -23,3 +23,5 @@ export const createTaskSchema = z.object({
   dueDate: z.coerce.date().optional(),
   description: z.string().optional(),
 });
+
+export const updateTaskSchema = createTaskSchema.partial();

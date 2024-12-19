@@ -194,7 +194,7 @@ export const columns: ColumnDef<Task>[] = [
     id: "actions",
     cell: ({ row }) => {
       return (
-        <TaskActions id={row.original.id} projectId={row.original.projectId}>
+        <TaskActions id={row.original.$id} projectId={row.original.projectId}>
           <Button variant="ghost" size="icon">
             <EllipsisIcon className="size-4" />
           </Button>

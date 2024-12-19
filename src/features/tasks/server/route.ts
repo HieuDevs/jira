@@ -1,7 +1,7 @@
 import { DATABASE_ID, MEMBERS_ID, PROJECTS_ID, TASKS_ID } from '@/config';
 import { getMember } from '@/features/members/utils';
 import { Project } from '@/features/projects/types';
-import { createTaskSchema } from "@/features/tasks/schemas";
+import { createTaskSchema, updateTaskSchema } from "@/features/tasks/schemas";
 import { createAdminClient } from '@/lib/appwrite';
 import { sessionMiddleware } from "@/lib/session-middleware";
 import { zValidator } from '@hono/zod-validator';
@@ -11,6 +11,80 @@ import { z } from "zod";
 import { Task, TaskPriority, TaskStatus } from '../types';
 
 const app = new Hono()
+    .patch(
+        "/:taskId",
+        sessionMiddleware,
+        zValidator("json",updateTaskSchema),
+        async (c) => {
+            const user = c.get("user");
+            const databases = c.get("databases");
+            const {name,status,workspaceId,projectId,assigneeId,priority,dueDate,description} = c.req.valid("json");
+            if (!workspaceId) {
+                return c.json({error: "Missing the workspace"},400);
+            }
+            if (!projectId) {
+                return c.json({error: "Missing the project"},400);
+            }
+            const member = await getMember({
+                databases,
+                userId: user.$id,
+                workspaceId: workspaceId,
+            });
+            if(!member) {
+                return c.json({error: "Unauthorized"},401);
+            }
+
+            const {taskId} = c.req.param();
+            const task = await databases.updateDocument(
+                DATABASE_ID,
+                TASKS_ID,
+                taskId,
+                {
+                    name,
+                    status,
+                    workspaceId,
+                    projectId,
+                    assigneeId,
+                    dueDate,
+                    description,
+                    ...(priority && { priority: priority.toUpperCase() }),
+                }
+            );
+            return c.json({data: task});
+        }
+    )
+    .delete(
+        "/:taskId",
+        sessionMiddleware,
+        async (c) => {
+            const user = c.get("user");
+            const databases = c.get("databases");
+            const {taskId} = c.req.param();
+            const task = await databases.getDocument<Task>(
+                DATABASE_ID,
+                TASKS_ID,
+                taskId
+            );
+            if(!task) {
+                return c.json({error: "Missing the task"},404);
+            }
+
+            const member = await getMember({
+                databases,
+                userId: user.$id,
+                workspaceId: task.workspaceId,
+            });
+            if(!member) {
+                return c.json({error: "Unauthorized"},401);
+            }
+            await databases.deleteDocument(
+                DATABASE_ID,
+                TASKS_ID,
+                taskId
+            );
+            return c.json({data: {$id: task.$id}});
+        }
+    )
     .get(
         "/",
         sessionMiddleware,
@@ -155,6 +229,103 @@ const app = new Hono()
                 }
             );
             return c.json({data: task});
+        }
+    )
+    .get(
+        "/:taskId",
+        sessionMiddleware,
+        async (c) => {
+            const user = c.get("user");
+            const {users} = await createAdminClient();
+            const databases = c.get("databases");
+            const {taskId} = c.req.param();
+            const task = await databases.getDocument<Task>(
+                DATABASE_ID,
+                TASKS_ID,
+                taskId
+            );
+            const member = await getMember({
+                databases,
+                userId: user.$id,
+                workspaceId: task.workspaceId,
+            });
+            if(!member) {
+                return c.json({error: "Unauthorized"},401);
+            }
+            const project = await databases.getDocument<Project>(
+                DATABASE_ID,
+                PROJECTS_ID,
+                task.projectId
+            );
+
+            const assignees = await Promise.all(task.assigneeId.map(async (assigneeId) => {
+                const member = await databases.getDocument(
+                    DATABASE_ID,
+                    MEMBERS_ID,
+                    assigneeId
+                );
+                const user = await users.get(member.userId);
+                return {
+                    ...user,
+                    name: user.name,
+                    email: user.email,
+                }
+            }));
+            return c.json({data: {
+                ...task,
+                project,
+                assignees,
+            }});
+        }
+    )
+    .post(
+        "/bulk-update",
+        sessionMiddleware,
+        zValidator("json",z.object({
+            tasks: z.array(z.object({
+                $id: z.string(),
+                status: z.nativeEnum(TaskStatus),
+                position: z.number().int().positive().min(1000).max(1000000),
+            })),
+        })),
+        async (c) => {
+
+            const databases = c.get("databases");
+            const {tasks} = c.req.valid("json");
+            const tasksId = tasks.map((task) => task.$id);
+            const tasksToUpdate = await databases.listDocuments(
+                DATABASE_ID,
+                TASKS_ID,
+                [Query.contains("$id", tasksId)]
+            );
+
+            const workspaceIds = new Set(tasksToUpdate.documents.map((task) => task.workspaceId));
+            if(workspaceIds.size !==1) {
+                return c.json({error: "All tasks must be in the same workspace"},400);
+            }
+            const workspaceId = workspaceIds.values().next().value;
+            const user = c.get("user");
+            const member = await getMember({
+                databases,
+                userId: user.$id,
+                workspaceId,
+            });
+            if(!member) {
+                return c.json({error: "Unauthorized"},401);
+            }
+            const updatedTasks = await Promise.all(tasks.map(async (task) => {
+                const {$id,status,position} = task;
+                return databases.updateDocument(
+                    DATABASE_ID,
+                    TASKS_ID,
+                    $id,
+                    {
+                        status,
+                        position,
+                    }
+                );
+            }));
+            return c.json({data: updatedTasks});
         }
     )
 

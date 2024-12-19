@@ -21,6 +21,7 @@ export type Task = Models.Document & {
   status: TaskStatus;
   priority: TaskPriority;
   projectId: string;
+  workspaceId: string;
   assigneeId: string[];
   dueDate: string;
 };

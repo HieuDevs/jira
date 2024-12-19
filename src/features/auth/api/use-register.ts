@@ -20,9 +20,9 @@ export const useRegister = () => {
       }
       return await response.json();
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       router.refresh();
-      await queryClient.invalidateQueries({ queryKey: ["current"] });
+      queryClient.invalidateQueries({ queryKey: ["current"] });
       toast.success("Registered successfully");
     },
     onError: () => {
