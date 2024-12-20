@@ -30,8 +30,8 @@ import { useUpdateWorkspace } from "../api/use-update-workspace";
 import { updateWorkspaceSchema } from "../schemas";
 import { Workspace } from "../types";
 interface EditWorkspaceFormProps {
-  onCancel?: () => void;
   initialValues: Workspace;
+  onCancel?: () => void;
 }
 
 export const EditWorkspaceForm = ({
@@ -71,14 +71,10 @@ export const EditWorkspaceForm = ({
       ...values,
       image: values.image instanceof File ? values.image : "",
     };
-    updateWorkspace(
-      { form: finalValues, param: { workspaceId: initialValues.$id } },
-      {
-        onSuccess: () => {
-          form.reset();
-        },
-      }
-    );
+    updateWorkspace({
+      form: finalValues,
+      param: { workspaceId: initialValues.$id },
+    });
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,7 +119,11 @@ export const EditWorkspaceForm = ({
       <Card className="w-full h-full border-none shadow-none">
         <CardHeader className="flex flex-row items-center gap-x-4 p-7 space-y-0">
           <Button
-            onClick={onCancel ? onCancel : () => router.push("/")}
+            onClick={
+              onCancel
+                ? onCancel
+                : () => router.push(`/workspaces/${initialValues.$id}`)
+            }
             variant="outline"
             size="icon"
           >

@@ -7,7 +7,7 @@ import { ID, Query } from "node-appwrite";
 import { z } from "zod";
 import { createProjectSchema, updateProjectSchema } from "../schemas";
 
-import { getProject } from "../queries";
+
 import { Project } from "../types";
 
 const app = new Hono()
@@ -67,9 +67,6 @@ const app = new Hono()
     if (!member) {
       return c.json({ error: "Unauthorized" }, 401);
     }
-
-
-
     return c.json({ data: project });
   })
   .post("/",sessionMiddleware,zValidator("form",createProjectSchema), async (c) => {
@@ -123,7 +120,7 @@ const app = new Hono()
         );
 
         return c.json({ data: project });
-      })
+  })
   .patch(
     "/:projectId",
     zValidator("form", updateProjectSchema),
@@ -135,9 +132,13 @@ const app = new Hono()
       const {projectId} = c.req.param()
       const {name, image} = c.req.valid("form")
 
-      const existingProject = await getProject({projectId})
-      if(!existingProject) {
-        return c.json({error: "Project not found"}, 404)
+      const existingProject = await databases.getDocument<Project>(
+        DATABASE_ID,
+        PROJECTS_ID,
+        projectId
+      );
+      if (!existingProject) {
+        return c.json({ error: "Project not found" }, 404);
       }
 
 
@@ -189,7 +190,11 @@ const app = new Hono()
       const {projectId} = c.req.param()
 
 
-      const project = await getProject({projectId})
+      const project = await databases.getDocument<Project>(
+        DATABASE_ID,
+        PROJECTS_ID,
+        projectId
+      )
       if(!project) {
         return c.json({error: "Project not found"}, 404)
       }

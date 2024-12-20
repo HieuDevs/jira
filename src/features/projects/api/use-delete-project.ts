@@ -2,7 +2,6 @@
 import { client } from "@/lib/rpc";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { InferRequestType, InferResponseType } from "hono";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 const deleteProjectEndpoint = client.api.projects[":projectId"]["$delete"];
@@ -11,7 +10,6 @@ type RequestType = InferRequestType<typeof deleteProjectEndpoint>;
 
 export const useDeleteProject = () => {
   const queryClient = useQueryClient();
-  const router = useRouter();
   const mutation = useMutation<ResponseType, Error, RequestType>({
     mutationFn: async ({param}) => {
       const response = await deleteProjectEndpoint({param: {projectId: param.projectId}});
@@ -22,7 +20,6 @@ export const useDeleteProject = () => {
     },
     onSuccess: ({data}) => {
       toast.success("Project deleted successfully");
-      router.refresh();
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       queryClient.invalidateQueries({ queryKey: ["project", data.$id] });
     },
