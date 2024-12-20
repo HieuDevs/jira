@@ -37,7 +37,7 @@ export const TaskDate = ({ value, className }: TaskDateProps) => {
   return (
     <div
       className={cn(
-        "inline-flex items-center px-2.5 py-1.5 rounded-md border",
+        "inline-flex items-center px-2 py-1 rounded-md border",
         bgColor,
         textColor,
         borderColor,

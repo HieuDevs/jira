@@ -12,19 +12,26 @@ import { useCreateTaskModal } from "../hooks/use-create-task-modal";
 import { useTaskFilters } from "../hooks/use-task-filters";
 import { TaskStatus } from "../types";
 import { columns } from "./columns";
+import { DataCalendar } from "./data-calendar";
 import { DataFilters } from "./data-filters";
 import { DataKanban } from "./data-kanban";
 import { DataTable } from "./data-table";
+import { useProjectId } from "@/features/projects/hooks/use-project-id";
 
-const TaskViewSwitcher = () => {
+interface TaskViewSwitcherProps {
+  hideProjectFilter?: boolean;
+}
+
+const TaskViewSwitcher = ({ hideProjectFilter }: TaskViewSwitcherProps) => {
   const [{ status, priority, projectId, assigneeId, search, dueDate }] =
     useTaskFilters();
   const { open } = useCreateTaskModal();
   const { mutate: bulkUpdateTasks } = useBulkUpdateTasks();
   const workspaceId = useWorkspaceId();
+  const projectIdHook = useProjectId();
   const { data: tasks, isLoading: isLoadingTasks } = useGetTasks({
     workspaceId: workspaceId,
-    projectId: projectId,
+    projectId: hideProjectFilter ? projectIdHook : projectId,
     status: status,
     priority: priority,
     assigneeId: assigneeId,
@@ -72,7 +79,7 @@ const TaskViewSwitcher = () => {
         ) : (
           <>
             <DottedSeparator className="my-4" />
-            <DataFilters />
+            <DataFilters hideProjectFilter={hideProjectFilter} />
             <DottedSeparator className="my-4" />
             <TabsContent value="table" className="mt-0">
               <DataTable columns={columns} data={tasks?.documents ?? []} />
@@ -83,8 +90,8 @@ const TaskViewSwitcher = () => {
                 onChange={handleKanbanChange}
               />
             </TabsContent>
-            <TabsContent value="calendar" className="mt-0">
-              {JSON.stringify(tasks)}
+            <TabsContent value="calendar" className="mt-0 h-full pb-4">
+              <DataCalendar data={tasks?.documents ?? []} />
             </TabsContent>
           </>
         )}

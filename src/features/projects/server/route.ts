@@ -8,96 +8,123 @@ import { z } from "zod";
 import { createProjectSchema, updateProjectSchema } from "../schemas";
 
 import { getProject } from "../queries";
+import { Project } from "../types";
 
 const app = new Hono()
-.get("/",sessionMiddleware,zValidator("query",z.object({
-  workspaceId: z.string()
-})), async (c) => {
-  const { workspaceId } = c.req.valid("query");
-  const user = c.get("user");
-  const databases = c.get("databases");
+  .get("/",sessionMiddleware,zValidator("query",z.object({
+    workspaceId: z.string()
+  })), async (c) => {
+    const { workspaceId } = c.req.valid("query");
+    const user = c.get("user");
+    const databases = c.get("databases");
 
-  if (!workspaceId) {
+    if (!workspaceId) {
+      return c.json({
+        error: "Workspace ID is required"
+      }, 400);
+    }
+
+    const member = await getMember({
+      databases,
+      workspaceId,
+      userId: user.$id
+    });
+    if (!member) {
+      return c.json({
+        error: "Unauthorized"
+      }, 401);
+    }
+    const projects = await databases.listDocuments(
+      DATABASE_ID,
+      PROJECTS_ID,
+      [
+          Query.equal("workspaceId", workspaceId),
+          Query.orderDesc("$createdAt")
+      ]
+    );
     return c.json({
-      error: "Workspace ID is required"
-    }, 400);
-  }
+      data: projects
+    });
+  })
+  .get("/:projectId",sessionMiddleware,zValidator("param",z.object({
+    projectId: z.string()
+  })), async (c) => {
+    const { projectId } = c.req.valid("param");
+    const user = c.get("user");
+    const databases = c.get("databases");
+    const project = await databases.getDocument<Project>(
+      DATABASE_ID,
+      PROJECTS_ID,
+      projectId
+    );
 
-  const member = await getMember({
-    databases,
-    workspaceId,
-    userId: user.$id
-  });
-  if (!member) {
-    return c.json({
-      error: "Unauthorized"
-    }, 401);
-  }
-  const projects = await databases.listDocuments(
-    DATABASE_ID,
-    PROJECTS_ID,
-    [
-        Query.equal("workspaceId", workspaceId),
-        Query.orderDesc("$createdAt")
-    ]
-  );
-  return c.json({
-    data: projects
-  });
-})
-.post("/",sessionMiddleware,zValidator("form",createProjectSchema), async (c) => {
-      const databases = c.get("databases");
-      const storage = c.get("storage");
-      const user = c.get("user")
-      const {name, image, workspaceId} = c.req.valid("form")
+    const member = await getMember({
+      databases,
+      workspaceId: project.workspaceId,
+      userId: user.$id
+    });
+
+    if (!member) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
 
 
-      if (!workspaceId) {
-        return c.json({
-          error: "Workspace ID is required"
-        }, 400);
-      }
 
-      const member = await getMember({
-        databases,
-        workspaceId,
-        userId: user.$id
-      });
-      if (!member) {
-        return c.json({
-          error: "Unauthorized"
-        }, 401);
-      }
+    return c.json({ data: project });
+  })
+  .post("/",sessionMiddleware,zValidator("form",createProjectSchema), async (c) => {
+        const databases = c.get("databases");
+        const storage = c.get("storage");
+        const user = c.get("user")
+        const {name, image, workspaceId} = c.req.valid("form")
 
-      let uploadedImageUrl: string | undefined
-      if (image instanceof File) {
-        const file = await storage.createFile(
-          IMAGES_BUCKET_ID,
-          ID.unique(),
-          image
-        )
-        const arrayBuffer = await storage.getFilePreview(
-          IMAGES_BUCKET_ID,
-          file.$id,
-        )
-        uploadedImageUrl = `data:image/png;base64,${Buffer.from(arrayBuffer).toString("base64")}`
-        // uploadedImageUrl = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!+`/storage/buckets/${IMAGES_BUCKET_ID}/files/${file.$id}/view?project=${process.env.NEXT_PUBLIC_APPWRITE_PROJECT}`
-      }
 
-      const project = await databases.createDocument(
-        DATABASE_ID,
-        PROJECTS_ID,
-        ID.unique(),
-        {
-          name: name,
-          imageUrl: uploadedImageUrl,
-          workspaceId: workspaceId,
+        if (!workspaceId) {
+          return c.json({
+            error: "Workspace ID is required"
+          }, 400);
         }
-      );
 
-      return c.json({ data: project });
-    })
-    .patch(
+        const member = await getMember({
+          databases,
+          workspaceId,
+          userId: user.$id
+        });
+        if (!member) {
+          return c.json({
+            error: "Unauthorized"
+          }, 401);
+        }
+
+        let uploadedImageUrl: string | undefined
+        if (image instanceof File) {
+          const file = await storage.createFile(
+            IMAGES_BUCKET_ID,
+            ID.unique(),
+            image
+          )
+          const arrayBuffer = await storage.getFilePreview(
+            IMAGES_BUCKET_ID,
+            file.$id,
+          )
+          uploadedImageUrl = `data:image/png;base64,${Buffer.from(arrayBuffer).toString("base64")}`
+          // uploadedImageUrl = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!+`/storage/buckets/${IMAGES_BUCKET_ID}/files/${file.$id}/view?project=${process.env.NEXT_PUBLIC_APPWRITE_PROJECT}`
+        }
+
+        const project = await databases.createDocument(
+          DATABASE_ID,
+          PROJECTS_ID,
+          ID.unique(),
+          {
+            name: name,
+            imageUrl: uploadedImageUrl,
+            workspaceId: workspaceId,
+          }
+        );
+
+        return c.json({ data: project });
+      })
+  .patch(
     "/:projectId",
     zValidator("form", updateProjectSchema),
     sessionMiddleware,
