@@ -3,8 +3,10 @@
 import { DottedSeparator } from "@/components/dotted-separator";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useProjectId } from "@/features/projects/hooks/use-project-id";
 import { useWorkspaceId } from "@/features/workspaces/hooks/use-workspace-id";
 import { Loader, PlusIcon } from "lucide-react";
+import { useQueryState } from "nuqs";
 import { useCallback } from "react";
 import { useBulkUpdateTasks } from "../api/use-bulk-update-tasks";
 import { useGetTasks } from "../api/use-get-tasks";
@@ -16,7 +18,6 @@ import { DataCalendar } from "./data-calendar";
 import { DataFilters } from "./data-filters";
 import { DataKanban } from "./data-kanban";
 import { DataTable } from "./data-table";
-import { useProjectId } from "@/features/projects/hooks/use-project-id";
 
 interface TaskViewSwitcherProps {
   hideProjectFilter?: boolean;
@@ -25,13 +26,16 @@ interface TaskViewSwitcherProps {
 const TaskViewSwitcher = ({ hideProjectFilter }: TaskViewSwitcherProps) => {
   const [{ status, priority, projectId, assigneeId, search, dueDate }] =
     useTaskFilters();
+  const [view, setView] = useQueryState("view", {
+    defaultValue: "table",
+  });
   const { open } = useCreateTaskModal();
   const { mutate: bulkUpdateTasks } = useBulkUpdateTasks();
   const workspaceId = useWorkspaceId();
-  const projectIdHook = useProjectId();
+  const paramProjectId = useProjectId();
   const { data: tasks, isLoading: isLoadingTasks } = useGetTasks({
     workspaceId: workspaceId,
-    projectId: hideProjectFilter ? projectIdHook : projectId,
+    projectId: hideProjectFilter ? paramProjectId : projectId,
     status: status,
     priority: priority,
     assigneeId: assigneeId,
@@ -53,7 +57,11 @@ const TaskViewSwitcher = ({ hideProjectFilter }: TaskViewSwitcherProps) => {
   );
 
   return (
-    <Tabs className="flex-1 w-full border rounded-lg" defaultValue="kanban">
+    <Tabs
+      className="flex-1 w-full border rounded-lg"
+      defaultValue={view}
+      onValueChange={setView}
+    >
       <div className="flex flex-col h-full p-4 overflow-auto">
         <div className="flex flex-col items-center justify-between gap-y-2 lg:flex-row">
           <TabsList className="w-full lg:w-auto">

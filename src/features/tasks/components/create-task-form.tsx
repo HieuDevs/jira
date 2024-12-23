@@ -72,7 +72,7 @@ export const CreateTaskForm = ({
         workspaceId: workspaceId,
       },
       {
-        onSuccess: ({ data }) => {
+        onSuccess: () => {
           form.reset();
           onCancel?.();
           // TODO: redirect to the task page

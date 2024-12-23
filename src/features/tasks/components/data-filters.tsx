@@ -40,6 +40,7 @@ export const DataFilters = ({ hideProjectFilter }: DataFiltersProps) => {
   }));
 
   const [
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     { status, priority, projectId, assigneeId, search, dueDate },
     setFilters,
   ] = useTaskFilters();

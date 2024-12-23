@@ -3,12 +3,14 @@ import { JoinWorkspaceForm } from "@/features/workspaces/components/join-workspa
 import { getWorkspaceInfo } from "@/features/workspaces/queries";
 import { redirect } from "next/navigation";
 
-interface WorkspaceIdJoinPageProps {
-  params: {
-    workspaceId: string;
-    invitecode: string;
-  };
-}
+type WorkspaceIdJoinPageParams = Promise<{
+  workspaceId: string;
+  invitecode: string;
+}>;
+
+type WorkspaceIdJoinPageProps = {
+  params: WorkspaceIdJoinPageParams;
+};
 
 const WorkspaceIdJoinPage = async ({ params }: WorkspaceIdJoinPageProps) => {
   const user = await getCurrentUser();
@@ -27,9 +29,9 @@ const WorkspaceIdJoinPage = async ({ params }: WorkspaceIdJoinPageProps) => {
     <div className="w-full lg:max-w-xl">
       <JoinWorkspaceForm
         initialValues={{
-          name: workspace?.name || "",
-          workspaceId: workspaceId,
-          invitecode: invitecode,
+          name: workspace.name || "",
+          workspaceId,
+          invitecode,
         }}
       />
     </div>
