@@ -5,7 +5,7 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { Query } from "node-appwrite";
 import { z } from "zod";
-import { MemberRole } from "../types";
+import { Member, MemberRole } from "../types";
 import { getMember } from "../utils";
 
 const app = new Hono().get(
@@ -23,7 +23,7 @@ const app = new Hono().get(
     }
 
     const members = await databases
-    .listDocuments(DATABASE_ID, MEMBERS_ID, [Query.equal("workspaceId", workspaceId)])
+    .listDocuments<Member>(DATABASE_ID, MEMBERS_ID, [Query.equal("workspaceId", workspaceId)])
     const populatedMembers = await Promise.all(members.documents.map(async (member) => {
         const user = await users.get(member.userId)
         return {
