@@ -1,4 +1,5 @@
 import { DATABASE_ID, MEMBERS_ID, PROJECTS_ID, TASKS_ID } from '@/config';
+import { createActivityLog } from "@/features/activity-logs/utils/create-activity-log";
 import { getMember } from '@/features/members/utils';
 import { Project } from '@/features/projects/types';
 import { createTaskSchema, updateTaskSchema } from "@/features/tasks/schemas";
@@ -8,6 +9,7 @@ import { zValidator } from '@hono/zod-validator';
 import { Hono } from "hono";
 import { ID, Query } from 'node-appwrite';
 import { z } from "zod";
+import { ActivityAction, ActivityEntityType } from "../../activity-logs/types";
 import { Task, TaskPriority, TaskStatus } from '../types';
 
 const app = new Hono()
@@ -35,6 +37,23 @@ const app = new Hono()
             }
 
             const {taskId} = c.req.param();
+            const existingTask = await databases.getDocument<Task>(
+                DATABASE_ID,
+                TASKS_ID,
+                taskId
+            );
+            const [existingProject, updatedProject] = await Promise.all([
+                databases.getDocument<Project>(
+                    DATABASE_ID,
+                    PROJECTS_ID,
+                    existingTask.projectId
+                ),
+                databases.getDocument<Project>(
+                    DATABASE_ID,
+                    PROJECTS_ID,
+                    projectId
+                ),
+            ]);
             const task = await databases.updateDocument(
                 DATABASE_ID,
                 TASKS_ID,
@@ -50,6 +69,36 @@ const app = new Hono()
                     ...(priority && { priority: priority.toUpperCase() }),
                 }
             );
+            const updatedPriority = priority ? priority.toUpperCase() : existingTask.priority;
+            const updatedDueDate = dueDate ?? existingTask.dueDate;
+            const updatedAssigneeIds = assigneeId ?? existingTask.assigneeId;
+            const changeParts: string[] = [];
+            if (existingTask.name !== name) changeParts.push(`name "${existingTask.name}" -> "${name}"`);
+            if (existingTask.status !== status) changeParts.push(`status ${existingTask.status} -> ${status}`);
+            if (existingTask.projectId !== projectId) {
+                changeParts.push(`project "${existingProject.name}" -> "${updatedProject.name}"`);
+            }
+            if (existingTask.dueDate !== updatedDueDate) changeParts.push(`dueDate ${existingTask.dueDate} -> ${updatedDueDate}`);
+            if (existingTask.description !== description) changeParts.push(`description updated`);
+            if (existingTask.priority !== updatedPriority) changeParts.push(`priority ${existingTask.priority} -> ${updatedPriority}`);
+            const assigneeChanged =
+                existingTask.assigneeId.length !== updatedAssigneeIds.length ||
+                existingTask.assigneeId.some((id) => !updatedAssigneeIds.includes(id));
+            if (assigneeChanged) changeParts.push(`assignees updated`);
+            await createActivityLog({
+                databases,
+                workspaceId: task.workspaceId,
+                projectId: task.projectId,
+                actorMemberId: member.$id,
+                actorName: user.name || user.email,
+                entityType: ActivityEntityType.TASK,
+                entityId: task.$id,
+                entityName: task.name,
+                action: ActivityAction.UPDATED,
+                description: changeParts.length
+                    ? `Task updated: ${task.name} (${changeParts.join(", ")})`
+                    : `Task updated: no field changes (${task.name})`,
+            });
             return c.json({data: task});
         }
     )
@@ -82,6 +131,18 @@ const app = new Hono()
                 TASKS_ID,
                 taskId
             );
+            await createActivityLog({
+                databases,
+                workspaceId: task.workspaceId,
+                projectId: task.projectId,
+                actorMemberId: member.$id,
+                actorName: user.name || user.email,
+                entityType: ActivityEntityType.TASK,
+                entityId: task.$id,
+                entityName: task.name,
+                action: ActivityAction.DELETED,
+                description: `Task deleted: ${task.name}`,
+            });
             return c.json({data: {$id: task.$id}});
         }
     )
@@ -120,7 +181,7 @@ const app = new Hono()
             }
             if(assigneeId) {
                 console.log("assigneeId",assigneeId);
-                query.push(Query.equal("assigneeId",assigneeId));
+                query.push(Query.contains("assigneeId",assigneeId));
             }
             if(status) {
                 console.log("status",status);
@@ -228,6 +289,18 @@ const app = new Hono()
                     priority: priority.toUpperCase(),
                 }
             );
+            await createActivityLog({
+                databases,
+                workspaceId: task.workspaceId,
+                projectId: task.projectId,
+                actorMemberId: member.$id,
+                actorName: user.name || user.email,
+                entityType: ActivityEntityType.TASK,
+                entityId: task.$id,
+                entityName: task.name,
+                action: ActivityAction.CREATED,
+                description: `Task created: ${task.name} (status: ${task.status}, priority: ${task.priority})`,
+            });
             return c.json({data: task});
         }
     )
@@ -236,14 +309,19 @@ const app = new Hono()
         sessionMiddleware,
         async (c) => {
             const user = c.get("user");
-            const {users} = await createAdminClient();
+            const {users, databases: adminDatabases} = await createAdminClient();
             const databases = c.get("databases");
             const {taskId} = c.req.param();
-            const task = await databases.getDocument<Task>(
-                DATABASE_ID,
-                TASKS_ID,
-                taskId
-            );
+            let task: Task;
+            try {
+                task = await adminDatabases.getDocument<Task>(
+                    DATABASE_ID,
+                    TASKS_ID,
+                    taskId
+                );
+            } catch {
+                return c.json({error: "Task not found"},404);
+            }
             const member = await getMember({
                 databases,
                 userId: user.$id,
@@ -252,7 +330,7 @@ const app = new Hono()
             if(!member) {
                 return c.json({error: "Unauthorized"},401);
             }
-            const project = await databases.getDocument<Project>(
+            const project = await adminDatabases.getDocument<Project>(
                 DATABASE_ID,
                 PROJECTS_ID,
                 task.projectId
@@ -324,6 +402,24 @@ const app = new Hono()
                         position,
                     }
                 );
+            }));
+            const taskBeforeMap = new Map(tasksToUpdate.documents.map((task) => [task.$id, task]));
+            await Promise.all(updatedTasks.map(async (task) => {
+                const before = taskBeforeMap.get(task.$id);
+                await createActivityLog({
+                    databases,
+                    workspaceId: task.workspaceId,
+                    projectId: task.projectId,
+                    actorMemberId: member.$id,
+                    actorName: user.name || user.email,
+                    entityType: ActivityEntityType.TASK,
+                    entityId: task.$id,
+                    entityName: task.name,
+                    action: ActivityAction.UPDATED,
+                    description: before
+                        ? `Task moved: ${task.name} (status: ${before.status} -> ${task.status})`
+                        : `Task moved: ${task.name} (status: ${task.status})`,
+                });
             }));
             return c.json({data: updatedTasks});
         }

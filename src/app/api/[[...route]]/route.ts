@@ -1,3 +1,4 @@
+import activityLogs from "@/features/activity-logs/server/route";
 import auth from "@/features/auth/server/route";
 import members from "@/features/members/server/route";
 import projects from "@/features/projects/server/route";
@@ -13,6 +14,7 @@ const routes = app
   .route("/auth", auth)
   .route("/workspaces", workspaces)
   .route("/members", members)
+  .route("/activity-logs", activityLogs)
   .route("/projects", projects)
   .route("/tasks", tasks);
 

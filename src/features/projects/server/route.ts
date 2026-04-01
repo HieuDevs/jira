@@ -1,4 +1,6 @@
 import { DATABASE_ID, IMAGES_BUCKET_ID, PROJECTS_ID, TASKS_ID } from "@/config";
+import { ActivityAction, ActivityEntityType } from "@/features/activity-logs/types";
+import { createActivityLog } from "@/features/activity-logs/utils/create-activity-log";
 import { getMember } from "@/features/members/utils";
 import { sessionMiddleware } from "@/lib/session-middleware";
 import { zValidator } from "@hono/zod-validator";
@@ -52,6 +54,9 @@ const app = new Hono()
     projectId: z.string()
   })), async (c) => {
     const { projectId } = c.req.valid("param");
+    if (!projectId || projectId === "undefined") {
+      return c.json({ error: "Project ID is required" }, 400);
+    }
     const user = c.get("user");
     const databases = c.get("databases");
     const project = await databases.getDocument<Project>(
@@ -75,6 +80,9 @@ const app = new Hono()
     projectId: z.string()
   })), async (c) => {
     const {projectId} = c.req.valid("param")
+    if (!projectId || projectId === "undefined") {
+      return c.json({ error: "Project ID is required" }, 400);
+    }
     const user = c.get("user")
     const databases = c.get("databases")
 
@@ -134,7 +142,7 @@ const app = new Hono()
       TASKS_ID,
       [
         Query.equal("projectId", projectId),
-        Query.equal("assigneeId", member.$id),
+        Query.contains("assigneeId", member.$id),
         Query.greaterThanEqual("$createdAt", thisMonthStart.toISOString()),
         Query.lessThanEqual("$createdAt", thisMonthEnd.toISOString())
       ]
@@ -145,7 +153,7 @@ const app = new Hono()
       TASKS_ID,
       [
         Query.equal("projectId", projectId),
-        Query.equal("assigneeId", member.$id),
+        Query.contains("assigneeId", member.$id),
         Query.greaterThanEqual("$createdAt", lastMonthStart.toISOString()),
         Query.lessThanEqual("$createdAt", lastMonthEnd.toISOString())
       ]
@@ -298,6 +306,18 @@ const app = new Hono()
             workspaceId: workspaceId,
           }
         );
+        await createActivityLog({
+          databases,
+          workspaceId: project.workspaceId,
+          projectId: project.$id,
+          actorMemberId: member.$id,
+          actorName: user.name || user.email,
+          entityType: ActivityEntityType.PROJECT,
+          entityId: project.$id,
+          entityName: project.name,
+          action: ActivityAction.CREATED,
+          description: `Project created: ${project.name}`,
+        });
 
         return c.json({ data: project });
   })
@@ -358,6 +378,25 @@ const app = new Hono()
           imageUrl: uploadedImageUrl,
         }
       );
+      await createActivityLog({
+        databases,
+        workspaceId: project.workspaceId,
+        projectId: project.$id,
+        actorMemberId: member.$id,
+        actorName: user.name || user.email,
+        entityType: ActivityEntityType.PROJECT,
+        entityId: project.$id,
+        entityName: project.name,
+        action: ActivityAction.UPDATED,
+        description:
+          existingProject.name !== project.name && existingProject.imageUrl !== project.imageUrl
+            ? `Project updated: renamed "${existingProject.name}" to "${project.name}", image changed`
+            : existingProject.name !== project.name
+              ? `Project updated: renamed "${existingProject.name}" to "${project.name}"`
+              : existingProject.imageUrl !== project.imageUrl
+                ? `Project updated: image changed (${project.name})`
+                : `Project updated: no changes (${project.name})`,
+      });
       return c.json({ data: project });
     }
   )
@@ -395,6 +434,18 @@ const app = new Hono()
         PROJECTS_ID,
         projectId
       )
+      await createActivityLog({
+        databases,
+        workspaceId: project.workspaceId,
+        projectId: project.$id,
+        actorMemberId: member.$id,
+        actorName: user.name || user.email,
+        entityType: ActivityEntityType.PROJECT,
+        entityId: project.$id,
+        entityName: project.name,
+        action: ActivityAction.DELETED,
+        description: `Project deleted: ${project.name}`,
+      });
       return c.json({ data: { $id: projectId }});
     }
   )

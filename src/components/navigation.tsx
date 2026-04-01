@@ -2,7 +2,7 @@
 
 import { useWorkspaceId } from "@/features/workspaces/hooks/use-workspace-id";
 import { cn } from "@/lib/utils";
-import { SettingsIcon, UsersIcon } from "lucide-react";
+import { HistoryIcon, SettingsIcon, UsersIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -35,6 +35,12 @@ const routes = [
     href: "/members",
     icon: UsersIcon,
     activeIcon: UsersIcon,
+  },
+  {
+    label: "Activity Logs",
+    href: "/activity-logs",
+    icon: HistoryIcon,
+    activeIcon: HistoryIcon,
   },
 ];
 

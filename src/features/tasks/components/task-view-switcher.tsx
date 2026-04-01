@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useProjectId } from "@/features/projects/hooks/use-project-id";
 import { useWorkspaceId } from "@/features/workspaces/hooks/use-workspace-id";
 import { Loader, PlusIcon } from "lucide-react";
-import { useQueryState } from "nuqs";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 import { useBulkUpdateTasks } from "../api/use-bulk-update-tasks";
 import { useGetTasks } from "../api/use-get-tasks";
@@ -26,9 +26,16 @@ interface TaskViewSwitcherProps {
 const TaskViewSwitcher = ({ hideProjectFilter }: TaskViewSwitcherProps) => {
   const [{ status, priority, projectId, assigneeId, search, dueDate }] =
     useTaskFilters();
-  const [view, setView] = useQueryState("view", {
-    defaultValue: "table",
-  });
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const view = searchParams.get("view") ?? "table";
+  const setView = (nextView: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("view", nextView);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
   const { open } = useCreateTaskModal();
   const { mutate: bulkUpdateTasks } = useBulkUpdateTasks();
   const workspaceId = useWorkspaceId();

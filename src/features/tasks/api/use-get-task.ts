@@ -8,15 +8,19 @@ interface UseGetTaskProps {
 export const useGetTask = ({taskId}: UseGetTaskProps) => {
   return useQuery({
     queryKey: ["task", taskId],
+    enabled: !!taskId,
     queryFn: async () => {
       const response = await client.api.tasks[":taskId"]["$get"]({
         param: {
           taskId,
         },
       });
-    if (!response.ok) {
-      throw new Error("Failed to fetch tasks");
-    }
+      if (response.status === 404) {
+        return null;
+      }
+      if (!response.ok) {
+        throw new Error("Failed to fetch task");
+      }
       const { data } = await response.json();
       return data;
     },

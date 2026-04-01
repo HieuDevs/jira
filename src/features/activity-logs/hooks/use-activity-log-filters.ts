@@ -1,33 +1,27 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { TaskPriority, TaskStatus } from "../types";
 
-type TaskFilters = {
+type ActivityLogFilters = {
   projectId: string | null;
-  status: TaskStatus | null;
-  priority: TaskPriority | null;
-  assigneeId: string | null;
-  search: string | null;
-  dueDate: string | null;
+  startDate: string | null;
+  endDate: string | null;
 };
 
-export const useTaskFilters = () => {
+export const useActivityLogFilters = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
-  const filters: TaskFilters = {
+  const filters: ActivityLogFilters = {
     projectId: searchParams.get("projectId"),
-    status: (searchParams.get("status") as TaskStatus | null) ?? null,
-    priority: (searchParams.get("priority") as TaskPriority | null) ?? null,
-    assigneeId: searchParams.get("assigneeId"),
-    search: searchParams.get("search"),
-    dueDate: searchParams.get("dueDate"),
+    startDate: searchParams.get("startDate"),
+    endDate: searchParams.get("endDate"),
   };
 
-  const setFilters = (nextFilters: Partial<TaskFilters>) => {
+  const setFilters = (nextFilters: Partial<ActivityLogFilters>) => {
     const params = new URLSearchParams(searchParams.toString());
+
     Object.entries(nextFilters).forEach(([key, value]) => {
       if (value) {
         params.set(key, value);
@@ -35,6 +29,7 @@ export const useTaskFilters = () => {
         params.delete(key);
       }
     });
+
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   };
